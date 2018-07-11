@@ -51,7 +51,7 @@ def on_press(key):
 moves = [top, bottom, left, right]
 
 
-for i in range(100):
+for i in range(50):
     move = random.randint(0, 3)
     moves[move]()    
     time.sleep(0.2)
