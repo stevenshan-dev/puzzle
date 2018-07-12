@@ -5,6 +5,7 @@ var moveUp    = () => { buttons[0].click(); };
 var moveDown  = () => { buttons[3].click(); };
 var moveLeft  = () => { buttons[1].click(); };
 var moveRight = () => { buttons[2].click(); };
+var reset     = () => { resetButton[0].click(); };
 
 var findReactComponent = function(el) {
   for (const key in el) {
@@ -137,19 +138,43 @@ function moveTowards(targetCoord)
     return 0;
 }
 
-function moveTo(coord)
+function moveTo(coord, callback = (() => {}))
 {
     var resultID = moveTowards(coord);
     if (resultID == -1)
     {
         console.log("Stopped moving");
+        callback(false);
     }
     else if (resultID == 1)
     {
         console.log("Successfully moved");
+        callback(true);
     }
     else if (resultID == 0)
     {
-        setTimeout(() => { moveTo(coord); }, 50);
+        setTimeout(() => { moveTo(coord, callback); }, 50);
     }
+}
+
+function tryMove(coord, tries = 5)
+{
+
+    if (tries <= 0)
+    {
+        return;
+    }
+    var callback = (succ) => {
+        if (succ)
+        {
+            console.log("DONE TRYING");
+        }
+        else
+        {
+            reset();
+            setTimeout(() => { tryMove(coord, tries - 1); }, 500);
+        }
+    };
+    console.log("Trying to move to " + coord + "; " + tries + " tries left");
+    moveTo(coord, callback);
 }
