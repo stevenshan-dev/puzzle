@@ -1,152 +1,155 @@
-buttons = document.getElementsByClassName("_3e_exnkhzU1IzEtnY-Il71");
-resetButton = document.getElementsByClassName("_1bxrRV1ZhB4iF88UCCptiW");
+var buttons = document.getElementsByClassName("_3e_exnkhzU1IzEtnY-Il71");
+var resetButton = document.getElementsByClassName("_1bxrRV1ZhB4iF88UCCptiW");
 
-// keep track of current position
-var current_x = 0, current_y = 0;
-var tiles = {};
-console.log("RELOAD");
+var moveUp    = () => { buttons[0].click(); };
+var moveDown  = () => { buttons[3].click(); };
+var moveLeft  = () => { buttons[1].click(); };
+var moveRight = () => { buttons[2].click(); };
 
-var moveUp    = () => { buttons[0].click(); return [current_x, current_y - 1]; };
-var moveDown  = () => { buttons[3].click(); return [current_x, current_y + 1]; };
-var moveLeft  = () => { buttons[1].click(); return [current_x - 1, current_y]; };
-var moveRight = () => { buttons[2].click(); return [current_x + 1, current_y]; };
-var reset     = () => { console.log("RESET"); resetButton[0].click(); current_x = 0; current_y = 0; tiles = {}; };
-var running = true;
+var findReactComponent = function(el) {
+  for (const key in el) {
+    if (key.startsWith('__reactInternalInstance$')) {
+      const fiberNode = el[key];
 
-var stuckMesg = "You are stuck, go ahead and reset!";
+      return fiberNode && fiberNode.return && fiberNode.return.stateNode;
+    }
+  }
+  return null;
+};
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+var alert = (message) => { console.log(message); };
+
+var root = findReactComponent(document.getElementById("root").firstChild);
+
+var SIZE = 150
+
+var getAdjList  = ()        => { return root.state.adjList; };
+var getCoord    = ()        => { return {"x": root.state.curCol, "y": root.state.curRow}; };
+var coord2index = (coord)   => { return SIZE * coord["y"] + coord["x"]; };
+var index2coord = (index)   => {
+    var rem = index % SIZE;
+    var quotient = Math.floor(index / SIZE);
+    return {"x": rem, "y": quotient};  
+};
+
+function bfs(start_coord, end_coord)
+{
+    var start_index = coord2index(start_coord);
+    var end_index = coord2index(end_coord);
+    var adjList = getAdjList();
+
+    var queue = [start_index];
+    var visited = [];
+    var n = SIZE * SIZE;
+    for (var i = 0; i < n; i++)
+    {
+        visited.push([false, []]);
+    }
+    visited[start_index] = [true, [start_index]];
+
+    while (queue.length > 0)
+    {
+        if (queue.indexOf(end_index) != -1)
+        {
+            return [true, visited[end_index][1]];
+        }
+
+        var tempQueue = [];
+        for (var position in queue)
+        {
+            position = queue[position];
+            var __tempQueue = adjList[position];
+
+            _tempQueue = [];
+            for (var temp in __tempQueue)
+            {
+                temp = __tempQueue[temp];
+                if (!visited[temp][0])
+                {
+                    _tempQueue.push(temp);
+                }
+            }
+
+            for (var nextPosition in _tempQueue)
+            {
+                nextPosition = _tempQueue[nextPosition];
+                visited[nextPosition][0] = true;
+                visited[nextPosition][1] = visited[position][1].concat([nextPosition]);
+            }
+
+            tempQueue = tempQueue.concat(_tempQueue);
+        }
+
+        queue = tempQueue;
+    }
+
+    return [false, []];
 }
 
-// alert handler to detect bad moves
-var alertHappened = false;
-var alertMesg = "";
-// overwrite default alert function so popup doesn't happen
-var alert = (message) => { 
-    if (message == stuckMesg)
-    {
-        running = false;
-    }
-    else 
-    {
-        alertHappened = true;
-        alertMesg = message;
-    }
-};
-// check if alert happens after running function f
-async function checkAlert(cb, f)
+function moveTowards(targetCoord)
 {
-    var args = Array.prototype.splice.call(arguments, 2);
-    alertHappened = false;
-    var result = f.apply(null, args);
-    await sleep(200);
-    if (!running)
+    var startCoord = getCoord();
+    console.log("(" + startCoord["x"] + ", " + startCoord["y"] + ")")
+    var end_index = coord2index(targetCoord);
+    var start_index = coord2index(startCoord);
+
+    if (start_index == end_index)
     {
-        console.log("FORCE STOP");
-        return;
-    }
-    var finalResult = {
-        "alert": alertHappened, 
-        "mesg": alertMesg, 
-        "return": result
-    };
-    cb(finalResult);
-};
-
-var randInt = (min, max) => { return Math.floor(Math.random() * (max - min + 1)) + min; };
-
-var moveOptions = [moveDown, moveRight, moveUp, moveLeft];
-
-var hashCoord = (x, y) => { return x + ":" + y };
-
-async function explore(totalMoves = 10, newMove = 0)
-{
-    if (totalMoves == 0)
-    {
-        console.log("DONE EXPLORING");
-        return;
+        console.log("Already there");
+        return 1;
     }
 
-    var index = hashCoord(current_x, current_y);
+    var dfsSolution =  bfs(startCoord, targetCoord);
+    var possible = dfsSolution[0], path = dfsSolution[1];
 
-    var callback = (mode) => {
-        var _function = (result) => {
-            var moved = false;
-
-            // check if validly moved
-            if (!result["alert"])
-            {
-                moved = true;
-                tiles[index]["dir"][dirIndex][1] += 1;
-
-                // update x and y coordinates
-                current_x = result["return"][0];
-                current_y = result["return"][1];
-                console.log(current_x + ", " + current_y)
-            }
-            tiles[index]["dir"][dirIndex][0] = !result["alert"];
-
-            if (moved)
-            {
-                explore(totalMoves - 1);
-            }
-            else
-            {
-                explore(totalMoves, newMove = mode);
-            }
-        }
-        return _function;
-    };
-
-    if ((newMove == 0 && index in tiles) || newMove == 2) // if visited before
+    if (!possible)
     {
-        var tile = tiles[index];
+        console.log("Not possible");
+        return -1;
+    }
 
-        // increment count of number of times visited this tile
-        if (newMove == 0)
-        {
-            tile["count"] += 1;
-        }
+    var first = index2coord(path[0]);
+    var second = index2coord(path[1]);
 
-        var dirIndex = -1;
-        var minVisits = 9999;
-        // find direction least explored
-        for (var i = 0; i < tile["dir"].length; i++)
-        {
-            var moveOption = tile["dir"][i];
-            if (moveOption[0] !== false && moveOption[1] < minVisits)
-            {
-                dirIndex = i;
-                minVisits = moveOption[1];
-            }
-        }
+    var delta_x = second["x"] - first["x"];
+    var delta_y = second["y"] - first["y"];
 
-        // try to move in that direction
-        checkAlert(callback(2), moveOptions[dirIndex]);
+    if (delta_x == 1)
+    {
+        moveRight();
+    }
+    else if (delta_x == -1)
+    {
+        moveLeft();
+    }
+    else if (delta_y == 1)
+    {
+        moveDown();
+    }
+    else if (delta_y == -1)
+    {
+        moveUp();
     }
     else
     {
-        tiles[index] = {"dir": [[null, 0], [null, 0], [null, 0], [null, 0]], "count": 1};
-        var moved = false;
-        
-        // choose random direction to move in
-        var dirIndex = randInt(0, moveOptions.length - 1) % 4;
-
-        // try to move in that direction 
-        checkAlert(callback(1), moveOptions[dirIndex]);
+        return -1;
     }
+    return 0;
 }
 
-var moveOptions = [moveDown, moveRight, moveDown, moveRight, moveUp, moveLeft];
-var xxxxx = 100;
-for (var i = 0; i < xxxxx; i++)
+function moveTo(coord)
 {
-    if (!running)
+    var resultID = moveTowards(coord);
+    if (resultID == -1)
     {
-        break;
+        console.log("Stopped moving");
     }
-    var x = randInt(0, moveOptions.length - 1);
-    var move = moveOptions[x];
-    move(); 
+    else if (resultID == 1)
+    {
+        console.log("Successfully moved");
+    }
+    else if (resultID == 0)
+    {
+        setTimeout(() => { moveTo(coord); }, 50);
+    }
 }
